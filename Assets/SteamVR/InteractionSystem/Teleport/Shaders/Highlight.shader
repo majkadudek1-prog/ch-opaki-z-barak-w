@@ -1,206 +1,130 @@
-﻿//======= Copyright (c) Valve Corporation, All rights reserved. ===============
-//
-// Purpose: Used for the teleport markers
-//
-//=============================================================================
-// UNITY_SHADER_NO_UPGRADE
-Shader "Valve/VR/Highlight"
+﻿Shader "Valve/VR/Highlight_URP_SinglePass"
 {
-	Properties
-	{
-		_TintColor( "Tint Color", Color ) = ( 1, 1, 1, 1 )
-		_SeeThru( "SeeThru", Range( 0.0, 1.0 ) ) = 0.25
-		_Darken( "Darken", Range( 0.0, 1.0 ) ) = 0.0
-		_MainTex( "MainTex", 2D ) = "white" {}
-	}
+    Properties
+    {
+        _TintColor("Tint Color", Color) = (1, 1, 1, 1)
+        _SeeThru("SeeThru", Range(0.0, 1.0)) = 0.25
+        _Darken("Darken", Range(0.0, 1.0)) = 0.0
+        _MainTex("MainTex", 2D) = "white" {}
+    }
 
-	//-------------------------------------------------------------------------------------------------------------------------------------------------------------
-	CGINCLUDE
+    SubShader
+    {
+        Tags 
+        { 
+            "Queue" = "Transparent" 
+            "RenderType" = "Transparent"
+            "RenderPipeline" = "UniversalPipeline"
+        }
+        LOD 100
 
-		// Pragmas --------------------------------------------------------------------------------------------------------------------------------------------------
-		#pragma target 5.0
-#if UNITY_VERSION >= 560
-		#pragma only_renderers d3d11 vulkan glcore
-#else
-		#pragma only_renderers d3d11 glcore
-#endif
-		#pragma exclude_renderers gles
-		#pragma multi_compile_instancing
+        Pass
+        {
+            Name "HighlightSinglePass"
+            
+            Blend One OneMinusSrcAlpha
+            Cull Off
+            ZWrite Off
+            ZTest Always  // Test against depth buffer but don't reject
 
-		// Includes -------------------------------------------------------------------------------------------------------------------------------------------------
-		#include "UnityCG.cginc"
+            HLSLPROGRAM
+            #pragma target 4.5
+            #pragma exclude_renderers gles gles3
+            #pragma multi_compile_instancing
+            
+            // Required for VR single pass instanced rendering
+            #pragma multi_compile _ STEREO_INSTANCING_ON STEREO_MULTIVIEW_ON
+            
+            #pragma vertex vert
+            #pragma fragment frag
+            
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareDepthTexture.hlsl"
 
-// Structs --------------------------------------------------------------------------------------------------------------------------------------------------
-struct VertexInput
-	{
-		float4 vertex : POSITION;
-		float2 uv : TEXCOORD0;
-		fixed4 color : COLOR;
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float2 uv : TEXCOORD0;
+                float4 color : COLOR;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
 
-		#if UNITY_VERSION >= 560
-		UNITY_VERTEX_INPUT_INSTANCE_ID
-		#endif
-	};
+            struct Varyings
+            {
+                float2 uv : TEXCOORD0;
+                float4 positionCS : SV_POSITION;
+                float4 color : COLOR;
+                float3 positionWS : TEXCOORD1;
+                float4 screenPos : TEXCOORD2;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+                UNITY_VERTEX_OUTPUT_STEREO
+            };
 
-	struct VertexOutput
-	{
-		float2 uv : TEXCOORD0;
-		float4 vertex : SV_POSITION;
-		fixed4 color : COLOR;
+            TEXTURE2D(_MainTex);
+            SAMPLER(sampler_MainTex);
 
-		#if UNITY_VERSION >= 560
-		UNITY_VERTEX_OUTPUT_STEREO
-		#endif
-	};
+            CBUFFER_START(UnityPerMaterial)
+                float4 _MainTex_ST;
+                float4 _TintColor;
+                float _SeeThru;
+                float _Darken;
+            CBUFFER_END
 
-	#if UNITY_VERSION >= 201810
-	// Globals --------------------------------------------------------------------------------------------------------------------------------------------------
-	UNITY_INSTANCING_BUFFER_START( Props )
-		UNITY_DEFINE_INSTANCED_PROP( float4, _TintColor )
-		UNITY_DEFINE_INSTANCED_PROP( sampler2D, _MainTex )
-		UNITY_DEFINE_INSTANCED_PROP( float4, _MainTex_ST )
-		UNITY_DEFINE_INSTANCED_PROP( float, _SeeThru )
-		UNITY_DEFINE_INSTANCED_PROP( float, _Darken )
-	UNITY_INSTANCING_BUFFER_END( Props )
+            Varyings vert(Attributes input)
+            {
+                Varyings output = (Varyings)0;
+                
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_TRANSFER_INSTANCE_ID(input, output);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
-	// MainVs ---------------------------------------------------------------------------------------------------------------------------------------------------
-	VertexOutput MainVS( VertexInput i )
-	{
-			VertexOutput o;
-			UNITY_SETUP_INSTANCE_ID( i );
-			UNITY_INITIALIZE_OUTPUT( VertexOutput, o );
-			UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO( o ); 
+                VertexPositionInputs vertexInput = GetVertexPositionInputs(input.positionOS.xyz);
+                output.positionCS = vertexInput.positionCS;
+                output.positionWS = vertexInput.positionWS;
+                output.uv = TRANSFORM_TEX(input.uv, _MainTex);
+                output.color = input.color;
+                output.screenPos = ComputeScreenPos(output.positionCS);
 
-			#if UNITY_VERSION >= 540
-					o.vertex = UnityObjectToClipPos( i.vertex );
-			#else
-					o.vertex = mul( UNITY_MATRIX_MVP, i.vertex );
-			#endif
+                return output;
+            }
 
-			o.uv = i.uv;
-			o.color = i.color;
+            half4 frag(Varyings input) : SV_Target
+            {
+                UNITY_SETUP_INSTANCE_ID(input);
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(input);
 
-			return o;
-		}
+                // Sample scene depth
+                float2 screenUV = input.screenPos.xy / input.screenPos.w;
+                float sceneDepth = SampleSceneDepth(screenUV);
+                float sceneDepthEye = LinearEyeDepth(sceneDepth, _ZBufferParams);
+                
+                // Get this fragment's depth
+                float fragmentDepthEye = LinearEyeDepth(input.positionCS.z, _ZBufferParams);
+                
+                // Check if we're behind something
+                bool isBehind = fragmentDepthEye > sceneDepthEye;
 
-	// MainPs ---------------------------------------------------------------------------------------------------------------------------------------------------
-	float4 MainPS( VertexOutput i ) : SV_Target
-	{
-		UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO( i );
-	
-		float4 vTexel = tex2D( UNITY_ACCESS_INSTANCED_PROP( Props, _MainTex ), i.uv ).rgba;
-		float4 vColor = vTexel.rgba * UNITY_ACCESS_INSTANCED_PROP( Props, _TintColor.rgba ) * i.color.rgba;
-		vColor.rgba = saturate( 2.0 * vColor.rgba );
-		float flAlpha = vColor.a;
+                // Sample texture
+                half4 vTexel = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv);
+                half4 vColor = vTexel * _TintColor * input.color;
+                
+                // Apply see-through effect if behind
+                if (isBehind)
+                {
+                    vColor *= _SeeThru;
+                }
+                
+                vColor = saturate(2.0 * vColor);
+                half flAlpha = vColor.a;
 
-		vColor.rgb *= vColor.a;
-		vColor.a = lerp( 0.0, UNITY_ACCESS_INSTANCED_PROP( Props, _Darken ), flAlpha );
+                vColor.rgb *= vColor.a;
+                vColor.a = lerp(0.0, _Darken, isBehind ? (flAlpha * _SeeThru) : flAlpha);
 
-		return vColor.rgba;
-	}
-
-	// MainPs ---------------------------------------------------------------------------------------------------------------------------------------------------
-	float4 SeeThruPS( VertexOutput i ) : SV_Target
-	{
-		UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO( i );
-
-		float4 vTexel = tex2D( UNITY_ACCESS_INSTANCED_PROP( Props, _MainTex ), i.uv ).rgba;
-		float4 vColor = vTexel.rgba * UNITY_ACCESS_INSTANCED_PROP( Props, _TintColor.rgba ) * i.color.rgba * UNITY_ACCESS_INSTANCED_PROP( Props, _SeeThru );
-		vColor.rgba = saturate( 2.0 * vColor.rgba );
-		float flAlpha = vColor.a;
-
-		vColor.rgb *= vColor.a;
-		vColor.a = lerp( 0.0, UNITY_ACCESS_INSTANCED_PROP( Props, _Darken ), flAlpha * UNITY_ACCESS_INSTANCED_PROP( Props, _SeeThru ) );
-
-		return vColor.rgba;
-	}
-	#else		
-		// Globals --------------------------------------------------------------------------------------------------------------------------------------------------
-		sampler2D _MainTex;
-		float4 _MainTex_ST;
-		float4 _TintColor;
-		float _SeeThru;
-		float _Darken;
-			
-		// MainVs ---------------------------------------------------------------------------------------------------------------------------------------------------
-		VertexOutput MainVS( VertexInput i )
-		{
-			VertexOutput o;
-#if UNITY_VERSION >= 540
-			o.vertex = UnityObjectToClipPos(i.vertex);
-#else
-			o.vertex = mul(UNITY_MATRIX_MVP, i.vertex);
-#endif
-			o.uv = TRANSFORM_TEX( i.uv, _MainTex );
-			o.color = i.color;
-			
-			return o;
-		}
-
-		// MainPs ---------------------------------------------------------------------------------------------------------------------------------------------------
-		float4 MainPS( VertexOutput i ) : SV_Target
-		{
-			float4 vTexel = tex2D( _MainTex, i.uv ).rgba;
-			float4 vColor = vTexel.rgba * _TintColor.rgba * i.color.rgba;
-			vColor.rgba = saturate( 2.0 * vColor.rgba );
-			float flAlpha = vColor.a;
-
-			vColor.rgb *= vColor.a;
-			vColor.a = lerp( 0.0, _Darken, flAlpha );
-
-			return vColor.rgba;
-		}
-
-		// MainPs ---------------------------------------------------------------------------------------------------------------------------------------------------
-		float4 SeeThruPS( VertexOutput i ) : SV_Target
-		{
-			float4 vTexel = tex2D( _MainTex, i.uv ).rgba;
-			float4 vColor = vTexel.rgba * _TintColor.rgba * i.color.rgba * _SeeThru;
-			vColor.rgba = saturate( 2.0 * vColor.rgba );
-			float flAlpha = vColor.a;
-
-			vColor.rgb *= vColor.a;
-			vColor.a = lerp( 0.0, _Darken, flAlpha * _SeeThru );
-
-			return vColor.rgba;
-		}
-	#endif
-
-		ENDCG
-
-	SubShader
-	{
-		Tags { "Queue" = "Transparent" "RenderType" = "Transparent" }
-			LOD 100
-
-			// Behind Geometry ---------------------------------------------------------------------------------------------------------------------------------------------------
-			Pass
-		{
-			// Render State ---------------------------------------------------------------------------------------------------------------------------------------------
-			Blend One OneMinusSrcAlpha
-			Cull Off
-			ZWrite Off
-			ZTest Greater
-
-			CGPROGRAM
-				#pragma vertex MainVS
-				#pragma fragment SeeThruPS
-
-			ENDCG
-		}
-
-			Pass
-		{
-			// Render State ---------------------------------------------------------------------------------------------------------------------------------------------
-			Blend One OneMinusSrcAlpha
-			Cull Off
-			ZWrite Off
-			ZTest LEqual
-
-			CGPROGRAM
-				#pragma vertex MainVS
-				#pragma fragment MainPS
-			ENDCG
-		}
-	}
+                return vColor;
+            }
+            ENDHLSL
+        }
+    }
+    
+    FallBack "Hidden/Universal Render Pipeline/FallbackError"
 }
