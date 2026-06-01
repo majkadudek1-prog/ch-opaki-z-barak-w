@@ -6,6 +6,8 @@ public class GrillKnobController : MonoBehaviour
     [Tooltip("Lista obiektów z Particle System (ogniem), którymi skrypt ma sterować.")]
     public ParticleSystem[] fireParticleSystems;
 
+    public GrillStove grillStove;
+
     [Header("Ustawienia Obrotu")]
     [Tooltip("Kąt progowy (w stopniach). Ogień włączy się, gdy pokrętło obróci się poniżej tej wartości.")]
     public float thresholdAngle = -87f;
@@ -35,6 +37,7 @@ public class GrillKnobController : MonoBehaviour
     // Metoda kontrolująca emisję cząsteczek
     private void SetEmissionActive(bool isActive)
     {
+        grillStove.isOn = isActive;
         foreach (ParticleSystem ps in fireParticleSystems)
         {
             if (ps != null)
