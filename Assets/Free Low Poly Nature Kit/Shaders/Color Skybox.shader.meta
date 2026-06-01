@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: eb83f1e3563679842bd814842b847324
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 192458
+  packageName: Simple Free Stylized Nature Kit
+  packageVersion: 1.0.0
+  assetPath: Assets/Free Low Poly Nature Kit/Shaders/Color Skybox.shader
+  uploadId: 427989

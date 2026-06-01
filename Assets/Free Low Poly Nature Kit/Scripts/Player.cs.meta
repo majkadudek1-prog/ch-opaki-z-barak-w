@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 6a1242c7f7981de4ea96d49f2a7ad895
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 192458
+  packageName: Simple Free Stylized Nature Kit
+  packageVersion: 1.0.0
+  assetPath: Assets/Free Low Poly Nature Kit/Scripts/Player.cs
+  uploadId: 427989
