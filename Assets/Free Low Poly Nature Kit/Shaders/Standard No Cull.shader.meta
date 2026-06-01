@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: b12bf50586897d747939b55c49c54e8b
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 192458
+  packageName: Simple Free Stylized Nature Kit
+  packageVersion: 1.0.0
+  assetPath: Assets/Free Low Poly Nature Kit/Shaders/Standard No Cull.shader
+  uploadId: 427989
