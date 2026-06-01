@@ -8765,15 +8765,10 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
-    m_RemovedComponents:
-    - {fileID: 3844052579622318661, guid: e9ea6042883144644bcbd90ffdb3b142, type: 3}
-    - {fileID: 1818823779312069042, guid: e9ea6042883144644bcbd90ffdb3b142, type: 3}
+    m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents:
-    - targetCorrespondingSourceObject: {fileID: 7081990746153059635, guid: e9ea6042883144644bcbd90ffdb3b142, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 1036586049}
+    m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: e9ea6042883144644bcbd90ffdb3b142, type: 3}
 --- !u!1 &569280806
 GameObject:
@@ -9824,11 +9819,6 @@ HingeJoint:
   m_EnablePreprocessing: 1
   m_MassScale: 1
   m_ConnectedMassScale: 1
---- !u!54 &651876757 stripped
-Rigidbody:
-  m_CorrespondingSourceObject: {fileID: 4335729036022511709, guid: e9ea6042883144644bcbd90ffdb3b142, type: 3}
-  m_PrefabInstance: {fileID: 556200816}
-  m_PrefabAsset: {fileID: 0}
 --- !u!1 &656719801
 GameObject:
   m_ObjectHideFlags: 0
@@ -15709,50 +15699,6 @@ Transform:
   - {fileID: 1812575454}
   m_Father: {fileID: 980047311}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1036586047 stripped
-GameObject:
-  m_CorrespondingSourceObject: {fileID: 7081990746153059635, guid: e9ea6042883144644bcbd90ffdb3b142, type: 3}
-  m_PrefabInstance: {fileID: 556200816}
-  m_PrefabAsset: {fileID: 0}
---- !u!59 &1036586049
-HingeJoint:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1036586047}
-  serializedVersion: 3
-  m_ConnectedBody: {fileID: 651876757}
-  m_ConnectedArticulationBody: {fileID: 0}
-  m_Anchor: {x: 0, y: 0, z: 0}
-  m_Axis: {x: 0, y: 1, z: 0}
-  m_AutoConfigureConnectedAnchor: 1
-  m_ConnectedAnchor: {x: 0, y: 0, z: 0}
-  m_UseSpring: 0
-  m_Spring:
-    spring: 0
-    damper: 0
-    targetPosition: 0
-  m_UseMotor: 0
-  m_Motor:
-    targetVelocity: 0
-    force: 0
-    freeSpin: 0
-  m_UseLimits: 0
-  m_ExtendedLimits: 0
-  m_UseAcceleration: 0
-  m_Limits:
-    min: 0
-    max: 0
-    bounciness: 0
-    bounceMinVelocity: 0.2
-    contactDistance: 0
-  m_BreakForce: 50
-  m_BreakTorque: Infinity
-  m_EnableCollision: 0
-  m_EnablePreprocessing: 1
-  m_MassScale: 1
-  m_ConnectedMassScale: 1
 --- !u!1 &1038539725
 GameObject:
   m_ObjectHideFlags: 0
