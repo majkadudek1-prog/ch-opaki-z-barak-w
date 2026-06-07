@@ -11,7 +11,7 @@ AnimatorStateMachine:
   m_ChildStates:
   - serializedVersion: 1
     m_State: {fileID: 533533992625768489}
-    m_Position: {x: 270, y: 110, z: 0}
+    m_Position: {x: 380, y: 100, z: 0}
   - serializedVersion: 1
     m_State: {fileID: -25907889299136692}
     m_Position: {x: 660, y: -60, z: 0}
@@ -37,7 +37,7 @@ BlendTree:
   m_Name: Blend Tree
   m_Childs:
   - serializedVersion: 2
-    m_Motion: {fileID: -61554550370894640, guid: f6c55d26eb6b82947a91525142654782, type: 3}
+    m_Motion: {fileID: -3020675710757272653, guid: 613caa4258aa7d443ac9de3025825a23, type: 3}
     m_Threshold: 0
     m_Position: {x: 0, y: 0}
     m_TimeScale: 1
