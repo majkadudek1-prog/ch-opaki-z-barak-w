@@ -22,16 +22,28 @@ public class PigAI : MonoBehaviour
     public float detectionRadius = 3.5f; 
     public float eatDistance = 1.5f;    
     public float wakeupAnimationTime = 3.2f; 
+    
+    public float playerStopDistance = 2.2f; 
+    // --- NOWE: Kontrola buforu (Deadzone) ---
+    [Tooltip("Ile metrów zapasu ma świnia, zanim ruszy ponownie (zapobiega mikro-kroczkom)")]
+    public float stopBuffer = 0.5f; 
+    private bool isWaitingAtBuffer = false; // Pamięta, czy świnia już stoi w buforze
+    // ----------------------------------------
+    private float originalStoppingDistance;
 
-    // --- NOWOŚĆ: Kontrola obrotu ---
     [Header("Ustawienia Spacerowania i Skrętu")]
     public float wanderRadius = 5f;       
     public float wanderIdleTime = 10f;    
     [Tooltip("Powyżej ilu stopni świnia ma się zatrzymać i zawrócić w miejscu?")]
     public float sharpTurnAngle = 45f; 
+    
+    // --- NOWE: Wzmacniacz animacji skrętu ---
+    [Tooltip("Zwiększ, by świnia mocniej wyginała się na zakrętach (np. 2.5 lub 3.0)")]
+    public float turnSensitivity = 2.5f; 
+    // ----------------------------------------
+    
     private float wanderTimer;
-    private float originalSpeed; // Zapamięta domyślną prędkość świni
-    // -------------------------------
+    private float originalSpeed; 
 
     [Header("Wizualne Śledzenie (VR)")]
     public Transform headBone;          
@@ -51,7 +63,8 @@ public class PigAI : MonoBehaviour
     void Start()
     {
         wanderTimer = wanderIdleTime; 
-        originalSpeed = agent.speed; // Zapisujemy Twoją ustawioną w Inspektorze prędkość
+        originalSpeed = agent.speed; 
+        originalStoppingDistance = agent.stoppingDistance; 
 
         oinkTimer = Random.Range(2f, oinkInterval); 
         if (sleepParticles != null && !isAwake)
@@ -84,20 +97,70 @@ public class PigAI : MonoBehaviour
 
         if (currentFood != null)
         {
-            agent.SetDestination(currentFood.position);
-            UpdateAnimator(true); 
+            bool isFoodHeld = false;
+            GameObject[] playerHands = GameObject.FindGameObjectsWithTag("PlayerHand");
+            foreach (GameObject hand in playerHands)
+            {
+                if (Vector3.Distance(currentFood.position, hand.transform.position) < 0.60f)
+                {
+                    isFoodHeld = true;
+                    break;
+                }
+            }
 
-            if (Vector3.Distance(transform.position, currentFood.position) <= eatDistance)
+            float distToFood = Vector3.Distance(transform.position, currentFood.position);
+
+            if (isFoodHeld)
+            {
+                // --- NOWE: Logika Histerezy (Strefa Buforowa) ---
+                // Jeśli weszła w strefę zatrzymania, każemy jej czekać
+                if (distToFood <= playerStopDistance)
+                {
+                    isWaitingAtBuffer = true;
+                }
+                // Jeśli oddalisz marchewkę poza strefę buforu (np. za plecy), świnia znów ruszy
+                else if (distToFood > playerStopDistance + stopBuffer)
+                {
+                    isWaitingAtBuffer = false;
+                }
+
+                if (isWaitingAtBuffer)
+                {
+                    agent.isStopped = true; 
+                    if (agent.hasPath) agent.ResetPath();
+                    UpdateAnimator(false); 
+                }
+                else
+                {
+                    agent.isStopped = false;
+                    agent.stoppingDistance = playerStopDistance; 
+                    agent.SetDestination(currentFood.position);
+                    UpdateAnimator(true);
+                }
+            }
+            else
+            {
+                isWaitingAtBuffer = false; // Resetujemy bufor
+                agent.isStopped = false;
+                agent.stoppingDistance = originalStoppingDistance; 
+                agent.SetDestination(currentFood.position);
+                UpdateAnimator(true);
+            }
+
+            if (distToFood <= eatDistance)
             {
                 EatFood();
             }
         }
         else
         {
+            isWaitingAtBuffer = false;
+            agent.isStopped = false;
+            agent.stoppingDistance = originalStoppingDistance; 
+
             if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
             {
-                animator.SetFloat("Forward", 0f, 0.25f, Time.deltaTime);
-                animator.SetFloat("Turn", 0f, 0.25f, Time.deltaTime);
+                UpdateAnimator(false);
 
                 wanderTimer += Time.deltaTime;
                 if (wanderTimer >= wanderIdleTime)
@@ -143,14 +206,12 @@ public class PigAI : MonoBehaviour
         }
     }
 
-    // --- ULEPSZONA FUNKCJA CHODZENIA Z ZAWRACANIEM ---
     void UpdateAnimator(bool isMoving)
     {
         if (isMoving)
         {
-            // 1. Sprawdzamy pod jakim kątem względem świni znajduje się najbliższy punkt na jej ścieżce
             Vector3 directionToTarget = agent.steeringTarget - transform.position;
-            directionToTarget.y = 0f; // Ignorujemy wysokość
+            directionToTarget.y = 0f; 
             
             float angleToTarget = Vector3.Angle(transform.forward, directionToTarget);
 
@@ -160,31 +221,32 @@ public class PigAI : MonoBehaviour
             float forwardSpeed = 0f;
             float turnSpeed = 0f;
 
-            // 2. Jeśli zakręt jest ostry (np. > 45 stopni)
             if (angleToTarget > sharpTurnAngle && directionToTarget.sqrMagnitude > 0.1f)
             {
-                // Zaciągamy hamulec: świnia "tupta" fizycznie w miejscu z minimalną prędkością
                 agent.speed = 0.2f; 
-                
-                // Animacja przodu zjeżdża do zera, włączamy na maksa obrót w lewą (-1) lub prawą (1) stronę
                 forwardSpeed = 0f; 
                 turnSpeed = Mathf.Sign(localDesiredVelocity.x) * 1f; 
             }
-            // 3. Jeśli zakręt jest łagodny (lub świnia idzie prosto)
             else
             {
-                // Puszczamy hamulec: przywracamy domyślną prędkość
                 agent.speed = originalSpeed; 
                 
                 Vector3 velocity = agent.velocity;
                 Vector3 localVelocity = transform.InverseTransformDirection(velocity);
                 
                 forwardSpeed = localVelocity.z / originalSpeed; 
-                turnSpeed = Mathf.Clamp(localDesiredVelocity.x * 1.5f, -1f, 1f);
+                
+                // --- NOWE: Używamy wzmacniacza turnSensitivity ---
+                turnSpeed = Mathf.Clamp(localDesiredVelocity.x * turnSensitivity, -1f, 1f);
             }
 
             animator.SetFloat("Forward", forwardSpeed, 0.25f, Time.deltaTime);
             animator.SetFloat("Turn", turnSpeed, 0.25f, Time.deltaTime);
+        }
+        else
+        {
+            animator.SetFloat("Forward", 0f, 0.25f, Time.deltaTime);
+            animator.SetFloat("Turn", 0f, 0.25f, Time.deltaTime);
         }
     }
 
