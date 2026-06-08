@@ -7,6 +7,9 @@ TagManager:
   - Marchewka
   - PlayerHand
   - CinemachineTarget
+  - projectile
+  - FxTemporaire
+  - RecordCam
   layers:
   - Default
   - TransparentFX

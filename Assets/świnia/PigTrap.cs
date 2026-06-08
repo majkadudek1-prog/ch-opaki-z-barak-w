@@ -21,6 +21,10 @@ public class PigTrap : MonoBehaviour
     public float freezeDelay = 0.25f;    // Czas do zamrożenia świni
     public float smallDoorDelay = 3f;    // Ile sekund czekać w ciszy przed otwarciem klapki
 
+    [Header("Dźwięki (Audio)")]
+    public AudioSource trapAudio;       // Głośnik zamontowany na pułapce
+    public AudioClip pigSquealSound;    // Dźwięk przerażonego kwiku świni
+
     private bool isTrapped = false;
     private bool isGateClosed = false;
     private float doorTimer = 0f;        // Zegar odliczający czas w ukryciu
@@ -42,6 +46,12 @@ public class PigTrap : MonoBehaviour
                 {
                     isGateClosed = true;
                     
+                    // NOWOŚĆ: Świnia kwiczy w momencie uderzenia bramy o ziemię!
+                    if (trapAudio != null && pigSquealSound != null)
+                    {
+                        trapAudio.PlayOneShot(pigSquealSound);
+                    }
+
                     // Świnia znika w ciemnościach
                     if (trappedPig != null)
                     {
