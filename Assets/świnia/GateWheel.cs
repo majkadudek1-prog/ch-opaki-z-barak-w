@@ -13,15 +13,23 @@ public class GateWheel : MonoBehaviour
     public float requiredRotations = 3f;  
     public float dropSpeed = 0.5f;        
     
+    [Header("Fizyka Koła (VR Inertia)")]
+    [Tooltip("Oporność koła. Wyższa wartość = koło szybciej się zatrzyma po puszczeniu.")]
+    public float resistance = 1.0f; 
+    [Tooltip("Jak szybko koło reaguje na ruch ręki (czułość).")]
+    public float responsiveness = 5f;
+
     [HideInInspector]
     public bool isTrapSprung = false;     
 
     private float currentProgress = 0f;   
     private Vector3 lastHandLocalPos;
     private bool isHandInside = false;
-
-    // NOWOŚĆ: Zmienna sprawdzająca, czy brama "zatrzasnęła się" na górze
     private bool isLockedOpen = false;
+
+    // NOWE ZMIENNE: Do obsługi płynnego wygaszania ruchu
+    private float wheelVelocity = 0f; 
+    private bool isHandMovingThisFrame = false;
 
     void Update()
     {
@@ -30,17 +38,35 @@ public class GateWheel : MonoBehaviour
         // 1. Sprawdzamy, czy dociągnęliśmy bramę do samego końca (100%)
         if (currentProgress >= 1f)
         {
-            isLockedOpen = true; // ZATRZASK!
-            currentProgress = 1f; // Trzymamy sztywno na 100%
+            isLockedOpen = true; 
+            currentProgress = 1f; 
+            wheelVelocity = 0f; // Zatrzymujemy koło, gdy zaskoczy zatrzask
         }
 
-        // 2. Brama opada TYLKO wtedy, gdy:
-        // puścisz koło (!isHandInside) ORAZ brama nie jest na samym dole (> 0) ORAZ brama NIE zablokowała się na górze (!isLockedOpen)
-        if (!isHandInside && currentProgress > 0f && !isLockedOpen)
+        // 2. LOGIKA OPORU: Jeśli gracz nie kręci kołem w tej klatce
+        if (!isHandMovingThisFrame && !isLockedOpen)
         {
-            currentProgress -= dropSpeed * Time.deltaTime;
+            // Płynnie wygaszamy prędkość koła do zera na podstawie oporności (resistance)
+            wheelVelocity = Mathf.MoveTowards(wheelVelocity, 0f, resistance * Time.deltaTime);
+
+            // Grawitacja: Brama opada TYLKO wtedy, gdy koło całkowicie przestało się kręcić,
+            // gracz nie trzyma koła ORAZ brama nie jest na samym dole
+            if (wheelVelocity <= 0f && !isHandInside && currentProgress > 0f)
+            {
+                currentProgress -= dropSpeed * Time.deltaTime;
+                currentProgress = Mathf.Clamp01(currentProgress);
+            }
+        }
+
+        // 3. APLIKACJA RUCHU: Przesuwamy bramę o wyliczoną płynną prędkość koła
+        if (!isLockedOpen && wheelVelocity > 0f)
+        {
+            currentProgress += wheelVelocity * Time.deltaTime;
             currentProgress = Mathf.Clamp01(currentProgress);
         }
+
+        // Resetujemy flagę na koniec klatki (OnTriggerStay podniesie ją w następnej, jeśli ręka się ruszy)
+        isHandMovingThisFrame = false;
 
         // Fizyczne przesuwanie bramy i obrót koła
         mainGate.position = Vector3.Lerp(gateClosedPos.position, gateOpenPos.position, currentProgress);
@@ -55,7 +81,6 @@ public class GateWheel : MonoBehaviour
 
     void OnTriggerEnter(Collider other)
     {
-        // Jeśli brama się zablokowała, ignorujemy już rękę (nie trzeba dalej kręcić)
         if (isTrapSprung || isLockedOpen) return; 
 
         if (other.CompareTag("PlayerHand"))
@@ -78,11 +103,17 @@ public class GateWheel : MonoBehaviour
 
             float angleDelta = Vector2.SignedAngle(lastDir, currentDir);
 
+            // Sprawdzamy, czy ręka faktycznie wykonuje ruch obrotowy wokół środka koła
             if (Mathf.Abs(angleDelta) > 0.1f) 
             {
                 float progressDelta = Mathf.Abs(angleDelta) / (requiredRotations * 360f);
-                currentProgress += progressDelta;
-                currentProgress = Mathf.Clamp01(currentProgress);
+                
+                // Wyliczamy rzeczywistą prędkość ruchu ręki gracza na sekundę
+                float handSpeed = progressDelta / Time.deltaTime;
+
+                // Koło płynnie zbliża się do prędkości ręki (nadajemy mu masę przez responsiveness)
+                wheelVelocity = Mathf.Lerp(wheelVelocity, handSpeed, Time.deltaTime * responsiveness);
+                isHandMovingThisFrame = true;
             }
 
             lastHandLocalPos = currentHandLocalPos;
