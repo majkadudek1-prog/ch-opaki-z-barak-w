@@ -8,33 +8,56 @@ public class PigAI : MonoBehaviour
     public NavMeshAgent agent;
     public ParticleSystem eatParticles;
 
+    [Header("Efekty Spania i Budzenia")]
+    public ParticleSystem sleepParticles;
+    public ParticleSystem wakeupParticles;
+
+    [Header("Dźwięki (Audio)")]
+    public AudioSource pigAudio;
+    public AudioClip idleOinkSound;
+    public float oinkInterval = 7f;
+    private float oinkTimer;
+
     [Header("Ustawienia Wykrywania")]
     public float detectionRadius = 3.5f; 
     public float eatDistance = 1.5f;    
     public float wakeupAnimationTime = 3.2f; 
 
-    [Header("Ustawienia Spacerowania")]
-    public float wanderRadius = 5f;       // Jak daleko od siebie świnka może wybrać nowy punkt do spaceru
-    public float wanderIdleTime = 10f;    // Ile sekund stoi w miejscu przed kolejnym krokiem
+    // --- NOWOŚĆ: Kontrola obrotu ---
+    [Header("Ustawienia Spacerowania i Skrętu")]
+    public float wanderRadius = 5f;       
+    public float wanderIdleTime = 10f;    
+    [Tooltip("Powyżej ilu stopni świnia ma się zatrzymać i zawrócić w miejscu?")]
+    public float sharpTurnAngle = 45f; 
     private float wanderTimer;
+    private float originalSpeed; // Zapamięta domyślną prędkość świni
+    // -------------------------------
 
     [Header("Wizualne Śledzenie (VR)")]
-    public Transform headBone;          // Przeciągnij tutaj kość Head z Hierarchy
-    public float maxLookAngle = 60f;    // Maksymalny kąt, by świnia nie skręciła sobie karku o 180 stopni
+    public Transform headBone;          
+    public float maxLookAngle = 80f;    
     [Range(0f, 1f)]
-    public float lookAtWeight = 0.6f;   // Jak mocno głowa ma podążać (np. 0.6 to naturalny zez, 1.0 to sztywne patrzenie)
+    public float lookAtWeight = 0.8f;   
+    
+    public Vector3 headRotationOffset; 
 
     private Transform currentFood;
-    private bool isAwake = false;
+    public bool isAwake = false;
     private bool isWakingUp = false;
 
-    // NOWE ZMIENNE DO PŁYNNEGO RUCHU GŁOWY
     private float currentLookWeight = 0f;
     private Quaternion currentLookRotation;
 
     void Start()
     {
-        wanderTimer = wanderIdleTime; // Sprawi, że po obudzeniu od razu pomyśli o spacerze, jeśli nie ma jedzenia
+        wanderTimer = wanderIdleTime; 
+        originalSpeed = agent.speed; // Zapisujemy Twoją ustawioną w Inspektorze prędkość
+
+        oinkTimer = Random.Range(2f, oinkInterval); 
+        if (sleepParticles != null && !isAwake)
+        {
+            sleepParticles.Play();
+        }
     }
 
     void Update()
@@ -46,35 +69,39 @@ public class PigAI : MonoBehaviour
             return;
         }
 
-        // Zawsze najpierw szukaj jedzenia
+        if (pigAudio != null && idleOinkSound != null)
+        {
+            oinkTimer += Time.deltaTime;
+            if (oinkTimer >= oinkInterval)
+            {
+                pigAudio.PlayOneShot(idleOinkSound);
+                oinkTimer = 0f;
+                oinkInterval = Random.Range(5f, 12f); 
+            }
+        }
+
         LookForFood();
 
-        // LOGIKA 1: Jest jedzenie -> Biegnij do niego
         if (currentFood != null)
         {
             agent.SetDestination(currentFood.position);
-            UpdateAnimator(true); // Wywołujemy naszą nową, ulepszoną funkcję ruchu
+            UpdateAnimator(true); 
 
             if (Vector3.Distance(transform.position, currentFood.position) <= eatDistance)
             {
                 EatFood();
             }
         }
-        // LOGIKA 2: Nie ma jedzenia -> Spaceruj po zagrodzie
         else
         {
-            // Sprawdź, czy świnka doszła już do wyznaczonego punktu spaceru
             if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
             {
-                // Świnka stoi w miejscu - wygładzamy animacje do zera (stan fin)
-                animator.SetFloat("Forward", 0f, 0.15f, Time.deltaTime);
-                animator.SetFloat("Turn", 0f, 0.15f, Time.deltaTime);
+                animator.SetFloat("Forward", 0f, 0.25f, Time.deltaTime);
+                animator.SetFloat("Turn", 0f, 0.25f, Time.deltaTime);
 
-                // Odliczanie czasu stania
                 wanderTimer += Time.deltaTime;
                 if (wanderTimer >= wanderIdleTime)
                 {
-                    // Czas minął -> wybierz nowy losowy punkt na NavMeshu
                     Vector3 newWanderPos = GetRandomNavMeshLocation(wanderRadius);
                     agent.SetDestination(newWanderPos);
                     wanderTimer = 0f;
@@ -82,66 +109,82 @@ public class PigAI : MonoBehaviour
             }
             else
             {
-                // Świnka idzie w trakcie spaceru
                 UpdateAnimator(true);
             }
         }
     }
 
-    // --- MAGIA ŚLEDZENIA GŁOWĄ (PŁYNNA) ---
     void LateUpdate()
     {
-        // Zabezpieczenie, jeśli nie przypisano kości
         if (headBone == null) return;
 
         bool shouldLook = false;
 
-        // Jeśli świnka nie śpi i widzi marchewkę
         if (isAwake && currentFood != null)
         {
             Vector3 directionToFood = currentFood.position - headBone.position;
             float angle = Vector3.Angle(transform.forward, directionToFood);
 
-            // Jeśli marchewka jest z przodu
             if (angle <= maxLookAngle)
             {
                 shouldLook = true;
-                // Zapisujemy idealny kąt patrzenia na jedzenie
-                currentLookRotation = Quaternion.LookRotation(directionToFood);
+                
+                Quaternion baseRotation = Quaternion.LookRotation(directionToFood);
+                currentLookRotation = baseRotation * Quaternion.Euler(headRotationOffset);
             }
         }
 
-        // Płynnie zwiększamy lub zmniejszamy wagę patrzenia (Mnożnik 3f to prędkość skręcania karku)
         float targetWeight = shouldLook ? lookAtWeight : 0f;
-        currentLookWeight = Mathf.Lerp(currentLookWeight, targetWeight, Time.deltaTime * 3f);
+        currentLookWeight = Mathf.Lerp(currentLookWeight, targetWeight, Time.deltaTime * 5f);
 
-        // Aplikujemy obrót tylko, jeśli waga jest większa od zera (czyli gdy świnia zaczyna patrzeć)
         if (currentLookWeight > 0.001f)
         {
             headBone.rotation = Quaternion.Slerp(headBone.rotation, currentLookRotation, currentLookWeight);
         }
     }
 
-    // --- FUNKCJA DO PŁYNNEGO RUCHU ---
+    // --- ULEPSZONA FUNKCJA CHODZENIA Z ZAWRACANIEM ---
     void UpdateAnimator(bool isMoving)
     {
         if (isMoving)
         {
-            // Prędkość do przodu
-            Vector3 velocity = agent.velocity;
-            Vector3 localVelocity = transform.InverseTransformDirection(velocity);
-            float forwardSpeed = localVelocity.z / agent.speed; 
+            // 1. Sprawdzamy pod jakim kątem względem świni znajduje się najbliższy punkt na jej ścieżce
+            Vector3 directionToTarget = agent.steeringTarget - transform.position;
+            directionToTarget.y = 0f; // Ignorujemy wysokość
+            
+            float angleToTarget = Vector3.Angle(transform.forward, directionToTarget);
 
-            // ULEPSZONY SKRĘT: Patrzymy gdzie NavMeshAgent CHCE iść, a nie jak się ślizga
             Vector3 desiredVelocity = agent.desiredVelocity;
             Vector3 localDesiredVelocity = transform.InverseTransformDirection(desiredVelocity).normalized;
-            
-            // localDesiredVelocity.x oddaje nam idealną wartość od -1 (mocno w lewo) do 1 (mocno w prawo)
-            // Mnożymy to lekko (* 1.5f), żeby świnia chętniej odtwarzała maksymalne wygięcie z animacji
-            float turnSpeed = Mathf.Clamp(localDesiredVelocity.x * 1.5f, -1f, 1f);
 
-            animator.SetFloat("Forward", forwardSpeed, 0.1f, Time.deltaTime);
-            animator.SetFloat("Turn", turnSpeed, 0.1f, Time.deltaTime);
+            float forwardSpeed = 0f;
+            float turnSpeed = 0f;
+
+            // 2. Jeśli zakręt jest ostry (np. > 45 stopni)
+            if (angleToTarget > sharpTurnAngle && directionToTarget.sqrMagnitude > 0.1f)
+            {
+                // Zaciągamy hamulec: świnia "tupta" fizycznie w miejscu z minimalną prędkością
+                agent.speed = 0.2f; 
+                
+                // Animacja przodu zjeżdża do zera, włączamy na maksa obrót w lewą (-1) lub prawą (1) stronę
+                forwardSpeed = 0f; 
+                turnSpeed = Mathf.Sign(localDesiredVelocity.x) * 1f; 
+            }
+            // 3. Jeśli zakręt jest łagodny (lub świnia idzie prosto)
+            else
+            {
+                // Puszczamy hamulec: przywracamy domyślną prędkość
+                agent.speed = originalSpeed; 
+                
+                Vector3 velocity = agent.velocity;
+                Vector3 localVelocity = transform.InverseTransformDirection(velocity);
+                
+                forwardSpeed = localVelocity.z / originalSpeed; 
+                turnSpeed = Mathf.Clamp(localDesiredVelocity.x * 1.5f, -1f, 1f);
+            }
+
+            animator.SetFloat("Forward", forwardSpeed, 0.25f, Time.deltaTime);
+            animator.SetFloat("Turn", turnSpeed, 0.25f, Time.deltaTime);
         }
     }
 
@@ -155,6 +198,9 @@ public class PigAI : MonoBehaviour
                 currentFood = hit.transform;
                 isWakingUp = true;
                 
+                if (sleepParticles != null) sleepParticles.Stop();
+                if (wakeupParticles != null) wakeupParticles.Play();
+
                 animator.SetTrigger("IsAwake"); 
                 Invoke(nameof(FinishWakeUp), wakeupAnimationTime);
                 break;
@@ -198,10 +244,9 @@ public class PigAI : MonoBehaviour
         
         Destroy(currentFood.gameObject);
         currentFood = null;
-        wanderTimer = 0f; // Po zjedzeniu postój chwilę przed kolejnym spacerem
+        wanderTimer = 0f; 
     }
 
-    // Specjalna funkcja, która bezpiecznie losuje punkt na niebieskiej podłodze (NavMesh)
     Vector3 GetRandomNavMeshLocation(float radius)
     {
         Vector3 randomDirection = Random.insideUnitSphere * radius;
@@ -209,7 +254,6 @@ public class PigAI : MonoBehaviour
         NavMeshHit hit;
         Vector3 finalPosition = transform.position;
         
-        // Szukamy najbliższego prawidłowego punktu na siatce nawigacji
         if (NavMesh.SamplePosition(randomDirection, out hit, radius, 1))
         {
             finalPosition = hit.position;
