@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: ba91a709ffe49a1479176422fd5a8af8
+guid: 613caa4258aa7d443ac9de3025825a23
 ModelImporter:
   serializedVersion: 24200
   internalIDToNameTable: []
@@ -31,18 +31,18 @@ ModelImporter:
     extraUserProperties: []
     clipAnimations:
     - serializedVersion: 16
-      name: pobudkafin
-      takeName: pobudkafin
-      internalID: -6120836938085653897
-      firstFrame: -16
-      lastFrame: 80
+      name: chrumek_stanie_
+      takeName: chrumek_stanie_
+      internalID: -3020675710757272653
+      firstFrame: 1
+      lastFrame: 49
       wrapMode: 0
       orientationOffsetY: 0
       level: 0
       cycleOffset: 0
       loop: 0
       hasAdditiveReferencePose: 0
-      loopTime: 0
+      loopTime: 1
       loopBlend: 0
       loopBlendOrientation: 0
       loopBlendPositionY: 0
@@ -58,7 +58,7 @@ ModelImporter:
       transformMask: []
       maskType: 3
       maskSource: {instanceID: 0}
-      additiveReferencePoseFrame: 0
+      additiveReferencePoseFrame: 1
     isReadable: 0
   meshes:
     lODScreenPercentages: []

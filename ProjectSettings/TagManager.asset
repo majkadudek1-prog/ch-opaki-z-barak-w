@@ -5,14 +5,16 @@ TagManager:
   serializedVersion: 3
   tags:
   - Marchewka
+  - PlayerHand
+  - CinemachineTarget
   layers:
   - Default
   - TransparentFX
   - Ignore Raycast
-  - 
+  - gracz_vr
   - Water
   - UI
-  - 
+  - BlokadaGracza
   - 
   - 
   - 
