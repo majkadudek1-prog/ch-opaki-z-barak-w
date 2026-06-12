@@ -10,6 +10,7 @@ TagManager:
   - projectile
   - FxTemporaire
   - RecordCam
+  - podloga
   layers:
   - Default
   - TransparentFX
